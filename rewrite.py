@@ -1,5 +1,3 @@
-from ctypes import sizeof
-from turtle import window_width
 import pygame, os, random
 pygame.init()
 
@@ -11,6 +9,7 @@ sizeOfTiles = 16
 gameScreen = pygame.display.set_mode((400, 400))
 gameInitiated = False
 sprites = {}
+textboxes = {}
 grid = {}
 run = True
 assignedMines = False
@@ -19,6 +18,27 @@ mouseX, mouseY = pygame.mouse.get_pos()
 darken = pygame.Surface((16, 16), pygame.SRCALPHA, 32)
 darken.fill((0, 0, 0, 0.25*255))
 darken.convert_alpha()
+def getSprite(path: str, name: str,extension: str ="png"):
+    getFile = pygame.image.load(path + "/" + name + "." + extension)
+    createSurface = pygame.Surface((getFile.get_width(), getFile.get_height())).convert_alpha()
+    createSurface.blit(getFile, (0, 0))
+    return createSurface
+
+def grabSprites():
+    spritesList = []
+    for directory, what, items in os.walk("sprites/", topdown=False):
+        for index in items:
+            imgName = str.removesuffix(index, ".png")
+            spritesList.append(imgName)
+    return(spritesList)
+def loadSprites():
+    list = grabSprites()
+    for i in range(list.__len__()):
+        keyValue = getSprite("sprites/", list[i])
+        keyName = list[i]
+        sprites[keyName] = keyValue
+
+loadSprites()
 #Tile Class
 class tile:
     def __init__(self, location: tuple, tileValue, tileSprite, gridList, surface,tileSize=16):
@@ -107,25 +127,9 @@ class tile:
             grid[self.neighbors["SW"]].neighboringMines += 1
             grid[self.neighbors["NW"]].neighboringMines += 1"""
     def countFlagged(self):
-
-        flagBacklog = 0
-        if grid[self.neighbors["N"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["E"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["S"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["W"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["NE"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["SE"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["SW"]].flagged == True:
-            flagBacklog += 1
-        if grid[self.neighbors["NW"]].flagged == True:
-            flagBacklog += 1
-        self.neighboringFlagged = flagBacklog
+        if self.flagged == True:
+            for i in self.neighbors:
+                grid[self.neighbors[i]].neighboringFlagged += 1
     def update(self):
             if self.shouldUpdate == True:
                 if(self.isShown == True):
@@ -166,14 +170,12 @@ class tile:
                         if grid[self.neighbors[i]].isShown == False:
                             grid[self.neighbors[i]].click(False, False, True)
                 if flag == True:
-                    if self.flagged == True:
-                        print("A")
-                        self.flagged = False
-                    else:
-                        print("B")
-                        self.flagged = True
-                    for i in grid:
-                        grid[i].countFlagged()
+                    if self.isShown == False:
+                        if self.flagged == True:
+                            self.flagged = False
+                        else:
+                            self.flagged = True
+                    self.countFlagged()
                     self.shouldUpdate = True
                 elif(self.tileValue == "mineTile" and self.flagged == False):
                     for i in grid:
@@ -189,29 +191,27 @@ class tile:
                     if self.neighboringMines == 0:
                         for i in self.neighbors:
                             grid[self.neighbors[i]].click(False, True)
+class textBox:
+    def __init__(self, position: tuple, size: tuple, fontsize: int or float, label: str):
+        self.x, self.y = position
+        self.w, self.h = size
+        self.labelValue = label
+        self.label = 0
+        self.font = pygame.font.Font("PressStart-Modified.ttf", fontsize)
+        self.textValue = ""
+        self.text = 0
+        self.sprite = sprites["buttonPressed"]
+        self.sprite = pygame.transform.scale(self.sprite, (self.w, self.h))
+        textboxes[label] = self
+    def draw(self):
+        self.text = self.font.render(self.textValue, False, (0, 0, 0))
+        self.label = self.font.render(self.labelValue, False, (0, 0, 0))
+        gameScreen.blit(self.sprite, (self.x - (self.w/2), self.y - (self.h/2)))
+        gameScreen.blit(self.text, (self.x - (self.w/2), self.y - (self.h/2)))
+        gameScreen.blit(self.label, (self.x - (self.w / 2), self.y - ((self.h / 2) + self.label.get_height())))
 
-
-def getSprite(path: str, name: str, width: int, height:int , extension: str ="png"):
-    getFile = pygame.image.load(path + "/" + name + "." + extension)
-    createSurface = pygame.Surface((width, height)).convert_alpha()
-    createSurface.blit(getFile, (0, 0))
-    return createSurface
-
-def grabSprites():
-    spritesList = []
-    for directory, what, items in os.walk("sprites/", topdown=False):
-        for index in items:
-            imgName = str.removesuffix(index, ".png")
-            spritesList.append(imgName)
-    return(spritesList)
-def loadSprites():
-    list = grabSprites()
-    for i in range(list.__len__()):
-        keyValue = getSprite("sprites/", list[i], 16, 16)
-        keyName = list[i]
-        sprites[keyName] = keyValue
-
-loadSprites()
+test = textBox((gameScreen.get_width()/ 3, gameScreen.get_height() / 3 + 3), (200, 50), 15, "Null")
+test.text = "Abcdd"
 def assignMines():
     global assignedMines, amountOfMines, rows, columns
     minesLeft = amountOfMines
@@ -248,15 +248,14 @@ def click(right=False, gameInfo={}):
         print(gameInfo)
         startGame(gameInfo["rows"], gameInfo["columns"], gameInfo["mines"])
 def tick(): 
-    topPieceMiddle = sprites["buttonMiddle"]
-    topPieceLeft = sprites["buttonLeft"]
-    topPieceRight = sprites["buttonRight"]
-    topPieceMiddle = pygame.transform.scale(topPieceMiddle, (gameScreen.get_width() - 24, 32))
-    topPieceLeft = pygame.transform.scale(topPieceLeft, (64, 32))
-    topPieceRight = pygame.transform.scale(topPieceRight, (64, 32))
-    gameScreen.blit(topPieceLeft, (0, 0))
-    gameScreen.blit(topPieceRight, (gameScreen.get_width() - 12, 0))
-    gameScreen.blit(topPieceMiddle, (12, 0))
+    topPiece = sprites["button"]
+    topPiece = pygame.transform.scale(topPiece, (gameScreen.get_width(), 32))
+    gameScreen.blit(topPiece, (0, 0))
+    #topPieceLeft = sprites["buttonLeft"]
+    #topPiece
+    #topPieceLeft = pygame.transform.scale(topPieceLeft, (16, 32))
+    #gameScreen.blit(topPieceLeft, (0, 0))
+
     for i in grid:
         
 
@@ -299,4 +298,5 @@ while run:
         for i in range(25):
             for x in range(25):
                 gameScreen.blit(sprites["blankTile"], (i * 16, x *16))
-    pygame.display.update()
+        test.draw()
+    pygame.display.update() 
